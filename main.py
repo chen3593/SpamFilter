@@ -1,3 +1,4 @@
+import sys
 import os
 import re
 
@@ -27,11 +28,10 @@ def count_token_in_training(label_table):
     for file_count in range(1, 2001):
         already_modified_token = set()
         email_path = training_set_path + "/TRAIN_"+ str(file_count) + ".eml"
-        #email_path = os.path.join(training_set_path, f)
         fp = open(email_path)
         token_list = re.split('[^a-zA-Z0-9_$-]+', fp.read())
         for token in token_list:
-            if '<' in token or '>' in token or token.isdigit():
+            if token.isdigit() or '<' in token or '>' in token:
                 continue
 
             if label_table[file_count] == 0:
@@ -81,44 +81,53 @@ def generateSpamicityTable():
                 spamicity = 0.01
             spamicity_table[token] = spamicity
     
-    return spamicity_table, label_table
+    return spamicity_table, label_table, count_ham, count_spam
 
-def calculate_rate(body, spamicity_table):
-    spamicity_list = []
+def calculate_rate(body, spamicity_table, num_interesting_count):
+    spamicity_list = set()
     token_list = re.split('[^a-zA-Z0-9_$-]+', body)
     for token in token_list:
-        if token in spamicity_table:
+        if token.isdigit() or '<' in token or '>' in token:
+            continue
+        else:
             spamicity = spamicity_table.get(token, 0.4)
-            spamicity_list.append((token, spamicity))
+        spamicity_list.add((token, spamicity))
 
     sorted_spamicity_list = sorted(spamicity_list, key=lambda spamicity_distance : abs(spamicity_distance[1] - 0.5), reverse=True)
     #print sorted_spamicity_list
 
     combined_spamicity = 1
     combined_hamicity = 1
-    for i in range(min(15, len(sorted_spamicity_list))):
+    for i in range(min(num_interesting_count, len(sorted_spamicity_list))):
+    #for i in range(len(sorted_spamicity_list)):
         combined_spamicity *= sorted_spamicity_list[i][1]
         combined_hamicity *= (1 - sorted_spamicity_list[i][1])
-    
-    prob_spam = combined_spamicity / (combined_spamicity + combined_hamicity)
-
-    
+    #try:
+        #if combined_spamicity == 0:
+        #    return 0.01
+        prob_spam = combined_spamicity / (combined_spamicity + combined_hamicity)
+    #except ZeroDivisionError:
+    #    print sorted_spamicity_list
+    #    raise 
     return prob_spam
 
-def run():
-    spamcity_table, label_table = generateSpamicityTable()
+def run(num_interesting_count):
+    spamcity_table, label_table, count_ham, count_spam = generateSpamicityTable()
     training_set_path = "test_data/test_set"
     result_list = []
     for file_count in range(2001, 2501):
         email_path = training_set_path + "/TRAIN_"+ str(file_count) + ".eml"
         fp = open(email_path)
-        result_list.append(calculate_rate(fp.read(), spamcity_table))
-    
+        result_list.append(calculate_rate(fp.read(), spamcity_table, num_interesting_count))
+
     file_num = 2001
     right_count = 0
     wrong_count = 0
     false_positive = 0
+    false_positive_list = []
     false_negative = 0
+    false_negative_list = []
+
     for result in result_list:
         spam = 0 if result > 0.9 else 1
         real = label_table.get(file_num)
@@ -127,14 +136,27 @@ def run():
         else:
             wrong_count += 1
             if spam == 0 and real == 1:
+                false_positive_list.append(file_num)
                 false_positive += 1
             else:
+                false_negative_list.append(file_num)
                 false_negative += 1
         file_num += 1
-    print right_count
-    print wrong_count
-    print "Rate of success :" +  str(float(right_count) / float(right_count + wrong_count))
-    print "Rate of false_positve :" +  str(float(false_positive) / float(right_count + wrong_count))
 
-run()
+    print "Right Filtering:" + str(right_count)
+    print "Wrong Filtering:" + str(wrong_count)
+    print "Rate of success :" +  str(float(right_count) / float(right_count + wrong_count))
+    print "Rate of false_positive :" +  str(float(false_positive) / float(right_count + wrong_count))
+    print "false positive list:"
+    print false_positive_list
+    print "false_negative List :" 
+    print false_negative_list
+    score = (50 * float(false_positive) + float(false_negative)) / (count_ham * 50 + count_spam) 
+    print score
+
+    
+
+
+args = sys.argv
+run(int(sys.argv[1]))
 #generateSpamicityTable()
