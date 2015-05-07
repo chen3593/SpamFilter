@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import time
 
 def load_label():
     label_path = "test_data/label"
@@ -19,13 +20,19 @@ def load_label():
                 count_ham += 1
     return label_table, count_ham, count_spam
             
-def count_token_in_training(label_table):
+def add_times_to_token_table(table, token):
+    if token in table:
+        table[token] += 1
+    else:
+        table[token] = 1
+def count_token_in_training(label_table, training_set_size):
     ham_token_times = dict()
     spam_token_times = dict()
     training_set_path = "test_data/training_set"
     files = os.listdir(training_set_path)
     
-    for file_count in range(1, 2001):
+    
+    for file_count in range(1, 1+training_set_size):
         already_modified_token = set()
         email_path = training_set_path + "/TRAIN_"+ str(file_count) + ".eml"
         fp = open(email_path)
@@ -35,20 +42,27 @@ def count_token_in_training(label_table):
                 continue
 
             if label_table[file_count] == 0:
-                if token in spam_token_times and not token in already_modified_token:
+                if not token in already_modified_token:
+                    add_times_to_token_table(spam_token_times, token)
                     already_modified_token.add(token)
-                    spam_token_times[token] += 1
-                else:
-                    already_modified_token.add(token)
-                    spam_token_times[token] = 1
+                #if token in spam_token_times and not token in already_modified_token:
+                #    addTokenToTable
+                #    already_modified_token.add(token)
+                #    spam_token_times[token] += 1
+                #else:
+                #    already_modified_token.add(token)
+                #    spam_token_times[token] = 1
             
             if label_table[file_count] == 1:
-                if token in ham_token_times and not token in already_modified_token:
-                    already_modified_token.add(token) 
-                    ham_token_times[token] += 1
-                else:
+                if not token in already_modified_token:
+                    add_times_to_token_table(ham_token_times, token)
                     already_modified_token.add(token)
-                    ham_token_times[token] = 1
+                #if token in ham_token_times and not token in already_modified_token:
+                #    already_modified_token.add(token) 
+                #    ham_token_times[token] += 1
+                #else:
+                #    already_modified_token.add(token)
+                #    ham_token_times[token] = 1
 
         file_count += 1
     #print spam_token_times
@@ -57,9 +71,9 @@ def count_token_in_training(label_table):
 
     return spam_token_times, ham_token_times
             
-def generateSpamicityTable():
+def generateSpamicityTable(training_set_size):
     label_table, count_ham, count_spam = load_label()
-    spam_token_times, ham_token_times= count_token_in_training(label_table)
+    spam_token_times, ham_token_times= count_token_in_training(label_table, training_set_size)
     token_set = set()
     spamicity_table = dict()
 
@@ -111,8 +125,8 @@ def calculate_rate(body, spamicity_table, num_interesting_count):
     #    raise 
     return prob_spam
 
-def run(num_interesting_count):
-    spamcity_table, label_table, count_ham, count_spam = generateSpamicityTable()
+def run(num_interesting_count, training_set_size, threshold):
+    spamcity_table, label_table, count_ham, count_spam = generateSpamicityTable(training_set_size)
     training_set_path = "test_data/test_set"
     result_list = []
     for file_count in range(2001, 2501):
@@ -129,7 +143,7 @@ def run(num_interesting_count):
     false_negative_list = []
 
     for result in result_list:
-        spam = 0 if result > 0.9 else 1
+        spam = 0 if result > threshold else 1
         real = label_table.get(file_num)
         if spam == label_table.get(file_num):
             right_count += 1
@@ -143,20 +157,27 @@ def run(num_interesting_count):
                 false_negative += 1
         file_num += 1
 
-    print "Right Filtering:" + str(right_count)
-    print "Wrong Filtering:" + str(wrong_count)
-    print "Rate of success :" +  str(float(right_count) / float(right_count + wrong_count))
-    print "Rate of false_positive :" +  str(float(false_positive) / float(right_count + wrong_count))
-    print "false positive list:"
-    print false_positive_list
-    print "false_negative List :" 
-    print false_negative_list
+    #print "Right Filtering:" + str(right_count)
+    #print "Wrong Filtering:" + str(wrong_count)
+    #print "Rate of success :" +  str(float(right_count) / float(right_count + wrong_count))
+    #print "Rate of false_positive :" +  str(float(false_positive) / float(right_count + wrong_count))
+    #print "false positive list:"
+    #print false_positive_list
+    #print "false_negative List :" 
+    #print false_negative_list
     score = (50 * float(false_positive) + float(false_negative)) / (count_ham * 50 + count_spam) 
-    print score
-
+    #print "Training Set Size:" + str(training_set_size)
+    #print "Num interesting count:" + str(num_interesting_count) + " Score is " + str(score)
+    print "threshold:", threshold
+    print "score:", score
     
-
-
 args = sys.argv
-run(int(sys.argv[1]))
+
+#t0 = time.time()
+#for i in range(10):
+run(int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]))
+#t1 = time.time()
+#result = t1 - t0
+#print "Total time:", t1 - t0, "sec"
+#print "Average time:", result / 10, "sec"
 #generateSpamicityTable()
