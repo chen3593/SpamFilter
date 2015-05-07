@@ -180,4 +180,3 @@ run(int(sys.argv[1]), int(sys.argv[2]), float(sys.argv[3]))
 #result = t1 - t0
 #print "Total time:", t1 - t0, "sec"
 #print "Average time:", result / 10, "sec"
-#generateSpamicityTable()
